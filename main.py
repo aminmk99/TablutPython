@@ -4,7 +4,7 @@ import sys
 import struct
 import re
 import agent
-from agent import get_next_move
+from agent.minimax import get_next_move
 
 HOST = 'localhost'
 PORTS = {

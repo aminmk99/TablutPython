@@ -2,56 +2,54 @@ import string
 
 def get_legal_moves(board, player_color):
     """
-    SUPER SIMPLE MOVE GENERATOR.
-    Only generates 1-step orthogonal moves if the destination is EMPTY.
-    This is NOT the full Tablut rules!
-    But enough to test Minimax architecture.
+    Less-dumb move generator:
+    - Pieces move orthogonally (up/down/left/right)
+    - Any number of consecutive EMPTY squares
+    - Stops when hitting a non-empty cell (piece, camp, castle, etc.)
+    NOTE: still simplified, but MUCH closer to real Tablut.
     """
 
     moves = []
     size = len(board)
 
-    # Cell label conversion helper
+    # column letters A..I, row numbers 1..9 (assuming 9x9)
     valid_columns = list(string.ascii_uppercase[:size])
     valid_rows = list(range(1, size + 1))
 
     def coord_to_pos(r, c):
         return f"{valid_columns[c]}{valid_rows[r]}"
 
+    # which cells belong to this player?
+    def is_my_piece(cell):
+        if player_color == "WHITE":
+            # in many implementations the king is a separate piece
+            return cell == "WHITE" or cell == "KING"
+        else:  # BLACK
+            return cell == "BLACK"
+
     for r in range(size):
         for c in range(size):
-            if board[r][c] == player_color:
+            cell = board[r][c]
+            if not is_my_piece(cell):
+                continue
 
-                # Try Up
-                if r - 1 >= 0 and board[r - 1][c] == "EMPTY":
+            start_pos = coord_to_pos(r, c)
+
+            # explore 4 directions: up, down, left, right
+            directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+            for dr, dc in directions:
+                nr, nc = r + dr, c + dc
+                # slide while inside board and empty
+                while 0 <= nr < size and 0 <= nc < size and board[nr][nc] == "EMPTY":
+                    to_pos = coord_to_pos(nr, nc)
                     moves.append({
-                        "from": coord_to_pos(r, c),
-                        "to": coord_to_pos(r - 1, c),
+                        "from": start_pos,
+                        "to": to_pos,
                         "turn": player_color
                     })
-
-                # Try Down
-                if r + 1 < size and board[r + 1][c] == "EMPTY":
-                    moves.append({
-                        "from": coord_to_pos(r, c),
-                        "to": coord_to_pos(r + 1, c),
-                        "turn": player_color
-                    })
-
-                # Try Left
-                if c - 1 >= 0 and board[r][c - 1] == "EMPTY":
-                    moves.append({
-                        "from": coord_to_pos(r, c),
-                        "to": coord_to_pos(r, c - 1),
-                        "turn": player_color
-                    })
-
-                # Try Right
-                if c + 1 < size and board[r][c + 1] == "EMPTY":
-                    moves.append({
-                        "from": coord_to_pos(r, c),
-                        "to": coord_to_pos(r, c + 1),
-                        "turn": player_color
-                    })
+                    # keep going further in this direction
+                    nr += dr
+                    nc += dc
 
     return moves
