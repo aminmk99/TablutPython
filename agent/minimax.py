@@ -5,6 +5,18 @@ from agent.evaluation import evaluate
 TIME_LIMIT_SECONDS = 60  # will be overwritten by main.py if -timeout provided
 
 
+def is_king_captured(board):
+    """
+    Simple king capture detection:
+    King is considered captured if it is NOT present on the board.
+    (We refine this later for full Tablut rules.)
+    """
+    for row in board:
+        if "KING" in row:
+            return False
+    return True
+
+
 def minimax(board, depth, alpha, beta, maximizing_player, player_color, start_time):
     """
     Minimax with alpha-beta pruning.
@@ -17,6 +29,12 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_color, start_ti
     # Time check (stop early)
     if time.time() - start_time > TIME_LIMIT_SECONDS - 1:
         return evaluate(board, player_color), None
+
+    if is_king_captured(board):
+        if player_color == "WHITE":
+            return -99999, None
+        else:
+            return 99999, None
 
     # Base case
     if depth == 0:
@@ -76,27 +94,55 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_color, start_ti
 def apply_move(board, move):
     """
     Applies a move to a board and returns a NEW board.
-    This is a simplified version for now.
+    This version includes basic capture simulation:
+    - Orthogonal sandwich capture (no special camp/castle rules yet)
+    - King is treated as WHITE (we refine later)
     """
 
     import copy
     new_board = copy.deepcopy(board)
 
-    from_pos = move["from"]
-    to_pos = move["to"]
-
-    # Convert A1 → (row,col)
-    from_r = int(from_pos[1]) - 1
-    from_c = ord(from_pos[0]) - ord('A')
-
-    to_r = int(to_pos[1]) - 1
-    to_c = ord(to_pos[0]) - ord('A')
+    # Convert A1/B2/etc → coordinates
+    from_r = int(move["from"][1]) - 1
+    from_c = ord(move["from"][0]) - ord('A')
+    to_r = int(move["to"][1]) - 1
+    to_c = ord(move["to"][0]) - ord('A')
 
     piece = new_board[from_r][from_c]
     new_board[from_r][from_c] = "EMPTY"
     new_board[to_r][to_c] = piece
 
+    # shorthand
+    me = piece
+    enemy = "BLACK" if me in ["WHITE", "KING"] else "WHITE"
+
+    # Capture routine: look around the destination square
+    directions = [(-1,0), (1,0), (0,-1), (0,1)]
+
+    for dr, dc in directions:
+        er = to_r + dr      # enemy row
+        ec = to_c + dc      # enemy col
+        br = to_r + 2*dr    # beyond row
+        bc = to_c + 2*dc    # beyond col
+
+        # Check enemy exists adjacent
+        if not (0 <= er < len(board) and 0 <= ec < len(board)):
+            continue
+        if new_board[er][ec] != enemy:
+            continue
+
+        # Beyond must be on board
+        if not (0 <= br < len(board) and 0 <= bc < len(board)):
+            continue
+
+        # Capture condition:
+        # If the enemy is sandwiched between our piece and another friendly ("me") piece
+        if new_board[br][bc] == me:
+            # Capture!
+            new_board[er][ec] = "EMPTY"
+
     return new_board
+
 
 
 def get_next_move(state, player_color):
