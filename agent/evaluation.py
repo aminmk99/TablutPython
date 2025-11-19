@@ -1,18 +1,29 @@
+# evaluation.py
+#
+# Hybrid evaluation focused on:
+# - White: king escape
+# - Black: king encirclement
+# - Lower weight on pawn count
+# - Simple, fast, and tuned for shallow search (depth 2–3)
+
+
 def evaluate(board, player_color):
     """
-    Stronger evaluation for Tablut.
-    Works for both WHITE (king side) and BLACK (attackers).
+    Returns a score from the perspective of player_color.
+    Higher score = better for player_color.
     """
 
-    # ----------------------------------------------------------------------
-    # Basic counts
-    # ----------------------------------------------------------------------
+    size = len(board)
+
+    # ------------------------------
+    # 1. Count pieces & find the king
+    # ------------------------------
     white_count = 0
     black_count = 0
     king_pos = None
 
-    for r in range(9):
-        for c in range(9):
+    for r in range(size):
+        for c in range(size):
             cell = board[r][c]
             if cell == "WHITE":
                 white_count += 1
@@ -21,53 +32,130 @@ def evaluate(board, player_color):
             elif cell == "KING":
                 king_pos = (r, c)
 
-    # score starts at piece difference (scaled)
-    score = (white_count - black_count) * 2
+    # King missing => game is already lost for White
+    if king_pos is None:
+        return -99999 if player_color == "WHITE" else 99999
 
-    # ----------------------------------------------------------------------
-    # King-related evaluation
-    # ----------------------------------------------------------------------
-    if king_pos is not None:
-        kr, kc = king_pos
+    kr, kc = king_pos
+    corners = [(0, 0), (0, size - 1), (size - 1, 0), (size - 1, size - 1)]
 
-        # 1. Distance to nearest escape tile (corners)
-        escapes = [(0,0), (0,8), (8,0), (8,8)]
-        min_escape = min(abs(kr-er) + abs(kc-ec) for (er,ec) in escapes)
+    # ----------------------------------------
+    # 2. King already on corner? -> huge win
+    # ----------------------------------------
+    if (kr, kc) in corners:
+        return 99999 if player_color == "WHITE" else -99999
 
-        # Closer to escape is good for WHITE, bad for BLACK
-        if player_color == "WHITE":
-            score += (10 - min_escape) * 5
-        else:
-            score -= (10 - min_escape) * 5
+    score = 0
 
-        # 2. King mobility (available legal moves)
-        mobility = king_mobility(board, king_pos)
-        if player_color == "WHITE":
-            score += mobility * 4
-        else:
-            score -= mobility * 4
-
+    # -------------------------------------------------
+    # 3. Piece difference (low weight, especially White)
+    # -------------------------------------------------
+    piece_diff = white_count - black_count
+    if player_color == "WHITE":
+        score += piece_diff * 4    # white pawns are expendable
     else:
-        # king missing → game is already lost
-        if player_color == "WHITE":
-            return -99999
-        else:
-            return 99999
+        score += piece_diff * 6    # black benefits more from material
 
-    # ----------------------------------------------------------------------
-    # Attacker advantage if surrounding king
-    # (encirclement bonus)
-    # ----------------------------------------------------------------------
-    encircle = king_surrounded_level(board, king_pos)
+    # -------------------------------------------------
+    # 4. King distance to nearest corner (escape pressure)
+    # -------------------------------------------------
+    max_dist = 2 * (size - 1)  # worst-case Manhattan distance
+    d_min = min(abs(kr - er) + abs(kc - ec) for (er, ec) in corners)
+    escape_proximity = max_dist - d_min  # larger = closer to escape
+
+    ESCAPE_WEIGHT = 20
+    if player_color == "WHITE":
+        score += ESCAPE_WEIGHT * escape_proximity
+    else:
+        score -= ESCAPE_WEIGHT * escape_proximity
+
+    # -------------------------------------------------
+    # 5. Fully open escape lines (no blockers; ready NOW)
+    # -------------------------------------------------
+    open_lines = count_open_escape_lines(board, king_pos)
+    OPEN_LINE_WEIGHT = 60
+    if player_color == "WHITE":
+        score += OPEN_LINE_WEIGHT * open_lines
+    else:
+        score -= OPEN_LINE_WEIGHT * open_lines
+
+    # -------------------------------------------------
+    # 6. King mobility (small effect)
+    # -------------------------------------------------
+    mobility = king_mobility(board, king_pos)
+    MOBILITY_WEIGHT = 2
+    if player_color == "WHITE":
+        score += MOBILITY_WEIGHT * mobility
+    else:
+        score -= MOBILITY_WEIGHT * mobility
+
+    # -------------------------------------------------
+    # 7. Encirclement: black pieces adjacent to king
+    # -------------------------------------------------
+    encirclement = king_adjacent_black_count(board, king_pos)
+    ENCIRCLEMENT_WEIGHT = 40
     if player_color == "BLACK":
-        score += encircle * 6
+        score += ENCIRCLEMENT_WEIGHT * encirclement
     else:
-        score -= encircle * 6
+        score -= ENCIRCLEMENT_WEIGHT * encirclement
 
     return score
 
-def king_mobility(board, king_pos):
+
+# ===========================
+# Helper: open escape lines
+# ===========================
+def count_open_escape_lines(board, king_pos):
+    """
+    Counts how many directions (up/down/left/right) have a
+    completely empty path from the king to the board edge.
+    This means the king can escape in 1 move (if rules allow).
+    """
     r, c = king_pos
+    size = len(board)
+    open_lines = 0
+
+    # Up
+    rr = r - 1
+    while rr >= 0 and board[rr][c] == "EMPTY":
+        rr -= 1
+    if rr < 0:
+        open_lines += 1
+
+    # Down
+    rr = r + 1
+    while rr < size and board[rr][c] == "EMPTY":
+        rr += 1
+    if rr >= size:
+        open_lines += 1
+
+    # Left
+    cc = c - 1
+    while cc >= 0 and board[r][cc] == "EMPTY":
+        cc -= 1
+    if cc < 0:
+        open_lines += 1
+
+    # Right
+    cc = c + 1
+    while cc < size and board[r][cc] == "EMPTY":
+        cc += 1
+    if cc >= size:
+        open_lines += 1
+
+    return open_lines
+
+
+# ===========================
+# Helper: king mobility
+# ===========================
+def king_mobility(board, king_pos):
+    """
+    Counts how many squares the king can slide to
+    in straight lines (rook moves) through EMPTY cells.
+    """
+    r, c = king_pos
+    size = len(board)
     moves = 0
 
     # up
@@ -78,7 +166,7 @@ def king_mobility(board, king_pos):
 
     # down
     rr = r + 1
-    while rr < 9 and board[rr][c] == "EMPTY":
+    while rr < size and board[rr][c] == "EMPTY":
         moves += 1
         rr += 1
 
@@ -90,22 +178,31 @@ def king_mobility(board, king_pos):
 
     # right
     cc = c + 1
-    while cc < 9 and board[r][cc] == "EMPTY":
+    while cc < size and board[r][cc] == "EMPTY":
         moves += 1
         cc += 1
 
     return moves
 
-def king_surrounded_level(board, king_pos):
-    r, c = king_pos
-    threats = 0
 
-    dirs = [(-1,0),(1,0),(0,-1),(0,1)]
+# ======================================
+# Helper: black adjacency to the king
+# ======================================
+def king_adjacent_black_count(board, king_pos):
+    """
+    Counts how many black pieces are directly up/down/left/right
+    next to the king. More = better for Black, worse for White.
+    """
+    r, c = king_pos
+    size = len(board)
+    dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    count = 0
+
     for dr, dc in dirs:
         rr = r + dr
         cc = c + dc
-        if 0 <= rr < 9 and 0 <= cc < 9:
+        if 0 <= rr < size and 0 <= cc < size:
             if board[rr][cc] == "BLACK":
-                threats += 1
+                count += 1
 
-    return threats
+    return count
