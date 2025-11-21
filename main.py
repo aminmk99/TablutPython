@@ -3,7 +3,6 @@ import json
 import sys
 import struct
 import re
-import agent
 from agent.minimax import get_next_move
 
 HOST = 'localhost'

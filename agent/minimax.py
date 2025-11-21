@@ -2,14 +2,13 @@ import time
 from agent.moves import get_legal_moves
 from agent.evaluation import evaluate
 
-TIME_LIMIT_SECONDS = 60  # will be overwritten by main.py if -timeout provided
+TIME_LIMIT_SECONDS = 60  # will be overwritten by main.py if -timeout provided or a number provided after the color
 
 
 def is_king_captured(board):
     """
     Simple king capture detection:
     King is considered captured if it is NOT present on the board.
-    (We refine this later for full Tablut rules.)
     """
     for row in board:
         if "KING" in row:
@@ -94,9 +93,7 @@ def minimax(board, depth, alpha, beta, maximizing_player, player_color, start_ti
 def apply_move(board, move):
     """
     Applies a move to a board and returns a NEW board.
-    This version includes basic capture simulation:
     - Orthogonal sandwich capture (no special camp/castle rules yet)
-    - King is treated as WHITE (we refine later)
     """
 
     import copy

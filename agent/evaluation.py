@@ -1,10 +1,3 @@
-# evaluation.py
-#
-# Hybrid evaluation focused on:
-# - White: king escape
-# - Black: king encirclement
-# - Lower weight on pawn count
-# - Simple, fast, and tuned for shallow search (depth 2–3)
 
 
 def evaluate(board, player_color):

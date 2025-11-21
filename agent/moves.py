@@ -1,11 +1,3 @@
-# moves.py
-#
-# Move generation for Tablut (Ashton rules, simplified):
-# - Pieces move like a rook: any number of empty squares orthogonally.
-# - Cannot move through or onto: castle (throne) or camps.
-# - Exception (handled implicitly): black can move OUT of camps,
-#   because the starting square is occupied by the piece, not traversed.
-
 
 import string
 
