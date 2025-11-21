@@ -154,9 +154,15 @@ def run_client(player_color, player_name, ip_address, replay_movess):
         print("Connection closed.")
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
+    import agent.minimax as minimax   # <-- ensure we can override this safely
+
+    args = sys.argv[1:]  # everything after main.py
 
     logfile = None
+
+    # ----------------------------------------------------
+    # Handle -R logfile
+    # ----------------------------------------------------
     if "-R" in args:
         try:
             r_index = args.index("-R")
@@ -165,30 +171,56 @@ if __name__ == "__main__":
         except (IndexError, ValueError):
             print("Error: -R must be followed by a file path.")
             sys.exit(1)
+
+    # ----------------------------------------------------
+    # Handle -timeout <value>
+    # ----------------------------------------------------
     if "-timeout" in args:
         try:
             t_index = args.index("-timeout")
             timeout_value = float(args.pop(t_index + 1))
             args.pop(t_index)
-            agent.TIME_LIMIT_SECONDS = timeout_value
-            print(f"Set TIME_LIMIT_SECONDS to {agent.TIME_LIMIT_SECONDS}")
+            minimax.TIME_LIMIT_SECONDS = timeout_value
+            print(f"[INFO] TIME_LIMIT_SECONDS set to {timeout_value} (from -timeout flag)")
         except (IndexError, ValueError):
             print("Error: -timeout must be followed by a numeric value.")
             sys.exit(1)
+
+    # ----------------------------------------------------
+    # Basic usage check
+    # ----------------------------------------------------
     if len(args) < 1 or args[0].upper() not in ["WHITE", "BLACK"]:
-        # if timeout is not passed it is set to 60 seconds by default.
-        print("\nUsage: python main.py <WHITE|BLACK> [-R logfile] [-timeout seconds (default 60)]")
-        print("\nExample: python main.py WHITE -R my_game.log")
-        print("Example: python main.py BLACK -timeout 30")
+        print("\nUsage: python main.py <WHITE|BLACK> [timeout] [ip] [-R logfile] [-timeout sec]")
         sys.exit(1)
 
+    # ----------------------------------------------------
+    # Parse required color argument
+    # ----------------------------------------------------
     color = args[0].upper()
     name = PLAYER_NAMES[color]
     ip = "localhost"
 
-    if len(args) == 2:
-        ip = args[1]
-        print(f"Using custom IP: {ip}")
+    # ----------------------------------------------------
+    # NEW FEATURE: positional timeout OR IP
+    # python main.py WHITE 45
+    # python main.py WHITE 192.168.1.20
+    # python main.py WHITE 45 192.168.1.20
+    # ----------------------------------------------------
+    if len(args) >= 2:
+        if args[1].isdigit():   # positional timeout
+            timeout_value = float(args[1])
+            minimax.TIME_LIMIT_SECONDS = timeout_value
+            print(f"[INFO] TIME_LIMIT_SECONDS set to {timeout_value} (positional argument)")
+            if len(args) >= 3:
+                ip = args[2]
+                print(f"[INFO] Using custom IP: {ip}")
+        else:
+            ip = args[1]
+            print(f"[INFO] Using custom IP: {ip}")
+
+    # ----------------------------------------------------
+    # Load replay moves if any
+    # ----------------------------------------------------
     replay_moves = None
     if logfile:
         print(f"Parsing replay file '{logfile}' for {color} moves...")
@@ -198,4 +230,8 @@ if __name__ == "__main__":
         else:
             print(f"Found {len(replay_moves)} {color} moves to replay.")
 
+    # ----------------------------------------------------
+    # Start client
+    # ----------------------------------------------------
     run_client(color, name, ip, replay_moves)
+
