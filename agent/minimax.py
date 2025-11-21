@@ -154,9 +154,7 @@ def get_next_move(state, player_color):
 
     start_time = time.time()
 
-    # Depth is small for now
-    # depth = 2
-    depth = 4
+    depth = 4 if player_color == "WHITE" else 3
 
     _, best_move = minimax(
         board,
