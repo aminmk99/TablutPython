@@ -11,8 +11,8 @@ PORTS = {
     "BLACK": 5801
 }
 PLAYER_NAMES = {
-    "WHITE": "ReplayAgentW",
-    "BLACK": "ReplayAgentB"
+    "WHITE": "AI_Ragazzi_W",
+    "BLACK": "AI_Ragazzi_B"
 }
 
 
